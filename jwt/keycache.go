@@ -46,11 +46,19 @@ func (kc *KeyCache) AddProvider(openIDConfigurationURL *url.URL) error {
 		return fmt.Errorf("could not decode JSON: %w", err)
 	}
 
+	// Validate the config has the required fields populated
 	if config.Issuer == "" || config.JWKSURI == nil {
 		return fmt.Errorf("config is not populated")
 	}
 
-	kc.providers[config.Issuer], err = NewKeyProvider(config.JWKSURI)
+	// Creaet the new key provider
+	p, err := NewKeyProvider(config.JWKSURI)
+	if err != nil {
+		return fmt.Errorf("could not create new key provider: %w")
+	}
+
+	// Register the provider for the issuers in the map
+	kc.providers[config.Issuer] = p
 
 	return nil
 }
