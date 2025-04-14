@@ -1,4 +1,8 @@
-package jwt
+package main
+
+type KeySet struct {
+	Keys []*Key `json:"keys"`
+}
 
 type Header struct {
 	Type      string `json:"typ"`

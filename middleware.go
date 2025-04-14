@@ -1,4 +1,4 @@
-package jwt
+package main
 
 import (
 	"crypto"
@@ -7,11 +7,46 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
 
-func Parse(tokenString string, keyFunc func(*Token) (*rsa.PublicKey, error)) (*Token, error) {
+type Middleware struct {
+	keys map[string]map[string]*rsa.PublicKey
+}
+
+func NewMiddleware(openIDConfigurationURLs []*url.URL) (*Middleware, error) {
+	m := &Middleware{
+		keys: map[string]map[string]*rsa.PublicKey{},
+	}
+
+	for _, url := range openIDConfigurationURLs {
+		var config OpenIDConfiguration
+		loadStructFromURL(&config, url)
+
+		var jwks KeySet
+		loadStructFromURL(&jwks, config.JWKSURI)
+
+		keyMap := map[string]*rsa.PublicKey{}
+
+		for _, k := range jwks.Keys {
+			pub, err := k.PublicKey()
+			if err != nil {
+				return nil, err
+			}
+
+			keyMap[k.KeyID] = pub
+		}
+
+		m.keys[config.Issuer] = keyMap
+	}
+
+	return m, nil
+}
+
+func (m *Middleware) Parse(tokenString string) (*Token, error) {
 	// Split the token string and verify it has 3 parts
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
@@ -61,10 +96,19 @@ func Parse(tokenString string, keyFunc func(*Token) (*rsa.PublicKey, error)) (*T
 		return nil, fmt.Errorf("token is expired")
 	}
 
-	// Get the public key for the token using the supplied keyFunc
-	pub, err := keyFunc(t)
-	if err != nil {
-		return nil, err
+	if time.Now().Unix() < t.ReservedClaims.NotBefore {
+		return nil, fmt.Errorf("token can not be used before: %v", t.ReservedClaims.NotBefore)
+	}
+
+	// Get the public key for the token using our map of cached keys
+	keyMap, ok := m.keys[t.ReservedClaims.Issuer]
+	if !ok {
+		return nil, fmt.Errorf("no keys found for issuer: %s", t.ReservedClaims.Issuer)
+	}
+
+	pub, ok := keyMap[t.Header.KeyID]
+	if !ok {
+		return nil, fmt.Errorf("no key found for kid: %s", t.Header.KeyID)
 	}
 
 	// Hash the token header/payload and verify the signature of the token
@@ -76,4 +120,26 @@ func Parse(tokenString string, keyFunc func(*Token) (*rsa.PublicKey, error)) (*T
 	}
 
 	return t, nil
+}
+
+func loadStructFromURL(v any, url *url.URL) error {
+	// Use the default HTTP client to make the request
+	resp, err := http.DefaultClient.Get(url.String())
+	if err != nil {
+		return fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check the HTTP status code
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad HTTP status: %d", resp.StatusCode)
+	}
+
+	// Populate the struct
+	err = json.NewDecoder(resp.Body).Decode(&v)
+	if err != nil {
+		return fmt.Errorf("could not decode JSON: %w", err)
+	}
+
+	return nil
 }
