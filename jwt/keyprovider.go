@@ -31,14 +31,8 @@ func NewKeyProvider(jwksuri *url.URL) (*KeyProvider, error) {
 }
 
 func (kp *KeyProvider) Refresh() error {
-	// Create the HTTP request
-	req, err := http.NewRequest(http.MethodGet, kp.jwksuri.String(), nil)
-	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
-	}
-
 	// Use the default HTTP client to make the request
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Get(kp.jwksuri.String())
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}

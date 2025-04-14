@@ -21,14 +21,8 @@ func NewKeyCache() *KeyCache {
 }
 
 func (kc *KeyCache) AddProvider(openIDConfigurationURL *url.URL) error {
-	// Create the HTTP request
-	req, err := http.NewRequest(http.MethodGet, openIDConfigurationURL.String(), nil)
-	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
-	}
-
 	// Use the default HTTP client to make the request
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Get(openIDConfigurationURL.String())
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
