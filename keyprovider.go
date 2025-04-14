@@ -1,25 +1,25 @@
-package jwt
+package main
 
 import (
 	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net/http"
 	"net/url"
+
+	"github.com/go-jose/go-jose/v4"
 )
 
 type KeyProvider struct {
 	jwksuri    *url.URL
-	keySet     *KeySet
+	keySet     *jose.JSONWebKeySet
 	publicKeys map[string]*rsa.PublicKey
 }
 
 func NewKeyProvider(jwksuri *url.URL) (*KeyProvider, error) {
 	kp := &KeyProvider{
 		jwksuri: jwksuri,
-		keySet:  &KeySet{},
+		keySet:  &jose.JSONWebKeySet{},
 	}
 
 	err := kp.Refresh()
@@ -58,12 +58,7 @@ func (kp *KeyProvider) Refresh() error {
 	// Populate the public key map
 	kp.publicKeys = map[string]*rsa.PublicKey{}
 	for _, k := range kp.keySet.Keys {
-		pub, err := publicKey(k)
-		if err != nil {
-			return err
-		}
-
-		kp.publicKeys[k.KeyID] = pub
+		kp.publicKeys[k.KeyID] = k.Key.(*rsa.PublicKey)
 	}
 
 	return nil
@@ -71,31 +66,4 @@ func (kp *KeyProvider) Refresh() error {
 
 func (kp *KeyProvider) Key(kid string) *rsa.PublicKey {
 	return kp.publicKeys[kid]
-}
-
-func publicKey(k *Key) (*rsa.PublicKey, error) {
-	// Decode the n and e values from base64.
-	modulusBytes, err := base64.RawURLEncoding.DecodeString(k.Modulus)
-	if err != nil {
-		return nil, err
-	}
-
-	exponentBytes, err := base64.RawURLEncoding.DecodeString(k.Exponent)
-	if err != nil {
-		return nil, err
-	}
-
-	//Construct a *big.Int from the n bytes.
-	n := new(big.Int).SetBytes(modulusBytes)
-
-	// Construct an int from the e bytes.
-	e := int(new(big.Int).SetBytes(exponentBytes).Int64())
-
-	// Construct a *rsa.PublicKey from the n and e values.
-	pubKey := &rsa.PublicKey{
-		N: n,
-		E: e,
-	}
-
-	return pubKey, nil
 }

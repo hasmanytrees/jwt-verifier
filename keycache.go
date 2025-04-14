@@ -1,4 +1,4 @@
-package jwt
+package main
 
 import (
 	"crypto/rsa"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type KeyCache struct {
@@ -83,9 +85,16 @@ func (kc *KeyCache) Key(issuer string, kid string) (*rsa.PublicKey, error) {
 	return k, nil
 }
 
-func (kc *KeyCache) KeyFunc(t *Token) (*rsa.PublicKey, error) {
-	issuer := t.ReservedClaims.Issuer
-	kid := t.Header.KeyID
+func (kc *KeyCache) KeyFunc(t *jwt.Token) (any, error) {
+	issuer, err := t.Claims.GetIssuer()
+	if err != nil {
+		return nil, err
+	}
+
+	kid := t.Header["kid"].(string)
+	if len(kid) == 0 {
+		return nil, fmt.Errorf("header does not contain a kid")
+	}
 
 	pub, err := kc.Key(issuer, kid)
 	if err != nil {

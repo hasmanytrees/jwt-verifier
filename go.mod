@@ -1,10 +1,14 @@
 module github.com/hasmanytrees/jwt-verifier
 
-go 1.20
+go 1.24
+
+toolchain go1.24.2
 
 require github.com/labstack/echo/v4 v4.13.3
 
 require (
+	github.com/go-jose/go-jose/v4 v4.1.0
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
