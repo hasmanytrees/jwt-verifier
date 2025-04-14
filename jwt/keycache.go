@@ -54,7 +54,7 @@ func (kc *KeyCache) AddProvider(openIDConfigurationURL *url.URL) error {
 	// Creaet the new key provider
 	p, err := NewKeyProvider(config.JWKSURI)
 	if err != nil {
-		return fmt.Errorf("could not create new key provider: %w")
+		return fmt.Errorf("could not create new key provider: %w", err)
 	}
 
 	// Register the provider for the issuers in the map
