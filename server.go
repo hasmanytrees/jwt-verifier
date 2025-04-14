@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/hasmanytrees/jwt-verifier/jwt"
-	"github.com/labstack/echo/v4"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/hasmanytrees/jwt-verifier/jwt"
+	"github.com/labstack/echo/v4"
 )
 
 func main() {
@@ -32,8 +34,12 @@ func JWTVerifier(kc *jwt.KeyCache) echo.MiddlewareFunc {
 
 			_, err := jwt.Parse(tokenString, kc.KeyFunc)
 			if err != nil {
+				c.String(echo.ErrBadRequest.Code, fmt.Sprintf("Error verifying token: %s\n", err.Error()))
 				return err
 			}
+
+			next(c)
+
 			return nil
 		}
 	}
