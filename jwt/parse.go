@@ -12,6 +12,8 @@ import (
 )
 
 func Parse(tokenString string, keyFunc func(*Token) (*rsa.PublicKey, error)) (*Token, error) {
+	start := time.Now()
+
 	// Split the token string and verify it has 3 parts
 	parts := strings.Split(tokenString, ".")
 	if len(parts) != 3 {
@@ -74,6 +76,9 @@ func Parse(tokenString string, keyFunc func(*Token) (*rsa.PublicKey, error)) (*T
 	if err != nil {
 		return nil, fmt.Errorf("could not verify token signature: %w", err)
 	}
+
+	duration := time.Since(start)
+	fmt.Printf("Parse duration: %v\n", duration)
 
 	return t, nil
 }
