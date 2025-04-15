@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
-	_ "net/http/pprof"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -15,13 +12,6 @@ import (
 )
 
 func main() {
-	if os.Getenv("APP_ENV") == "development" {
-		log.Println("Enabling pprof for profiling")
-		go func() {
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-	}
-
 	u, _ := url.Parse("https://cognito-idp.us-east-2.amazonaws.com/us-east-2_YqcxrkxxP/.well-known/openid-configuration")
 
 	m, err := NewMiddleware([]*url.URL{u}, WithRefresh)
