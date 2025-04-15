@@ -97,12 +97,14 @@ func (m *Middleware) Parse(tokenString string) (*Token, error) {
 		Signature:      decodedSignature,
 	}
 
+	now := time.Now().Unix()
+
 	// Verify the token is not expired
-	if time.Now().Unix() > t.ReservedClaims.ExpiresAt {
+	if now > t.ReservedClaims.ExpiresAt {
 		return nil, fmt.Errorf("token is expired")
 	}
 
-	if time.Now().Unix() < t.ReservedClaims.NotBefore {
+	if now < t.ReservedClaims.NotBefore {
 		return nil, fmt.Errorf("token can not be used before: %v", t.ReservedClaims.NotBefore)
 	}
 
