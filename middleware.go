@@ -10,43 +10,36 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Middleware struct {
-	keys map[string]map[string]*rsa.PublicKey
+	mu                      sync.Mutex
+	openIDConfigurationURLs []*url.URL
+	keys                    map[string]map[string]*rsa.PublicKey
+	withRefresh             bool
 }
 
-func NewMiddleware(openIDConfigurationURLs []*url.URL) (*Middleware, error) {
+type MiddlewareOption func(*Middleware)
+
+func WithRefresh(m *Middleware) {
+	m.withRefresh = true
+}
+
+func NewMiddleware(openIDConfigurationURLs []*url.URL, opts ...MiddlewareOption) (*Middleware, error) {
 	m := &Middleware{
-		keys: map[string]map[string]*rsa.PublicKey{},
+		openIDConfigurationURLs: openIDConfigurationURLs,
+		keys:                    map[string]map[string]*rsa.PublicKey{},
 	}
 
-	for _, url := range openIDConfigurationURLs {
-		var config OpenIDConfiguration
-		err := loadStructFromURL(&config, url)
-		if err != nil {
-			return nil, err
-		}
+	err := m.refreshKeys()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load keys from open id configuration urls: %w", err)
+	}
 
-		var jwks KeySet
-		err = loadStructFromURL(&jwks, config.JWKSURI)
-		if err != nil {
-			return nil, err
-		}
-
-		keyMap := map[string]*rsa.PublicKey{}
-
-		for _, k := range jwks.Keys {
-			pub, err := k.PublicKey()
-			if err != nil {
-				return nil, err
-			}
-
-			keyMap[k.KeyID] = pub
-		}
-
-		m.keys[config.Issuer] = keyMap
+	for _, o := range opts {
+		o(m)
 	}
 
 	return m, nil
@@ -108,15 +101,17 @@ func (m *Middleware) Parse(tokenString string) (*Token, error) {
 		return nil, fmt.Errorf("token can not be used before: %v", t.ReservedClaims.NotBefore)
 	}
 
-	// Get the public key for the token using our map of cached keys
-	keyMap, ok := m.keys[t.ReservedClaims.Issuer]
-	if !ok {
-		return nil, fmt.Errorf("no keys found for issuer: %s", t.ReservedClaims.Issuer)
-	}
-
-	pub, ok := keyMap[t.Header.KeyID]
-	if !ok {
-		return nil, fmt.Errorf("no key found for kid: %s", t.Header.KeyID)
+	// get the public key
+	pub, err := m.getKey(t)
+	if err != nil {
+		if m.withRefresh {
+			pub, err = m.getKey(t)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	// Hash the token header/payload and verify the signature of the token
@@ -128,6 +123,61 @@ func (m *Middleware) Parse(tokenString string) (*Token, error) {
 	}
 
 	return t, nil
+}
+
+func (m *Middleware) getKey(t *Token) (*rsa.PublicKey, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Get the public key for the token using our map of cached keys
+	keyMap, ok := m.keys[t.ReservedClaims.Issuer]
+	if !ok {
+		return nil, fmt.Errorf("no keys found for issuer: %s", t.ReservedClaims.Issuer)
+	}
+
+	pub, ok := keyMap[t.Header.KeyID]
+	if !ok {
+		return nil, fmt.Errorf("no key found for kid: %s", t.Header.KeyID)
+
+	}
+
+	return pub, nil
+}
+
+func (m *Middleware) refreshKeys() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	clear(m.keys)
+
+	for _, url := range m.openIDConfigurationURLs {
+		var config OpenIDConfiguration
+		err := loadStructFromURL(&config, url)
+		if err != nil {
+			return err
+		}
+
+		var jwks KeySet
+		err = loadStructFromURL(&jwks, config.JWKSURI)
+		if err != nil {
+			return err
+		}
+
+		keyMap := map[string]*rsa.PublicKey{}
+
+		for _, k := range jwks.Keys {
+			pub, err := k.PublicKey()
+			if err != nil {
+				return err
+			}
+
+			keyMap[k.KeyID] = pub
+		}
+
+		m.keys[config.Issuer] = keyMap
+	}
+
+	return nil
 }
 
 func loadStructFromURL(v any, url *url.URL) error {
