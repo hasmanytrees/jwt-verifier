@@ -24,7 +24,7 @@ func main() {
 
 	u, _ := url.Parse("https://cognito-idp.us-east-2.amazonaws.com/us-east-2_YqcxrkxxP/.well-known/openid-configuration")
 
-	m, err := NewMiddleware([]*url.URL{u})
+	m, err := NewMiddleware([]*url.URL{u}, WithRefresh)
 	if err != nil {
 		panic(err)
 	}
