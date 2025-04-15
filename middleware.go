@@ -105,6 +105,7 @@ func (m *Middleware) Parse(tokenString string) (*Token, error) {
 	pub, err := m.getKey(t)
 	if err != nil {
 		if m.withRefresh {
+			m.refreshKeys()
 			pub, err = m.getKey(t)
 			if err != nil {
 				return nil, err
