@@ -24,10 +24,16 @@ func NewMiddleware(openIDConfigurationURLs []*url.URL) (*Middleware, error) {
 
 	for _, url := range openIDConfigurationURLs {
 		var config OpenIDConfiguration
-		loadStructFromURL(&config, url)
+		err := loadStructFromURL(&config, url)
+		if err != nil {
+			return nil, err
+		}
 
 		var jwks KeySet
-		loadStructFromURL(&jwks, config.JWKSURI)
+		err = loadStructFromURL(&jwks, config.JWKSURI)
+		if err != nil {
+			return nil, err
+		}
 
 		keyMap := map[string]*rsa.PublicKey{}
 

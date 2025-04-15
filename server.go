@@ -2,15 +2,26 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"golang.org/x/exp/slog"
 )
 
 func main() {
+	if os.Getenv("APP_ENV") == "development" {
+		log.Println("Enabling pprof for profiling")
+		go func() {
+			log.Println(http.ListenAndServe("localhost:6060", nil))
+		}()
+	}
+
 	u, _ := url.Parse("https://cognito-idp.us-east-2.amazonaws.com/us-east-2_YqcxrkxxP/.well-known/openid-configuration")
 
 	m, err := NewMiddleware([]*url.URL{u})
@@ -40,7 +51,7 @@ func JWTVerifier(m *Middleware) echo.MiddlewareFunc {
 			}
 
 			duration := time.Since(start)
-			fmt.Printf("Parse duration: %v\n", duration)
+			slog.Info("Parse Complete", "duration", duration)
 
 			next(c)
 

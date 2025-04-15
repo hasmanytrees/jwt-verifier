@@ -1,8 +1,13 @@
 module github.com/hasmanytrees/jwt-verifier
 
-go 1.20
+go 1.23.0
 
-require github.com/labstack/echo/v4 v4.13.3
+toolchain go1.24.2
+
+require (
+	github.com/labstack/echo/v4 v4.13.3
+	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0
+)
 
 require (
 	github.com/labstack/gommon v0.4.2 // indirect
