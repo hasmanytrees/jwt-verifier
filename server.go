@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -36,16 +35,13 @@ func JWTVerifier(m *Middleware) echo.MiddlewareFunc {
 
 			_, err := m.Parse(tokenString)
 			if err != nil {
-				c.String(echo.ErrBadRequest.Code, fmt.Sprintf("Error verifying token: %s\n", err.Error()))
-				return err
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error()).SetInternal(err)
 			}
 
 			duration := time.Since(start)
 			slog.Info("Parse Complete", "duration", duration)
 
-			next(c)
-
-			return nil
+			return next(c)
 		}
 	}
 }

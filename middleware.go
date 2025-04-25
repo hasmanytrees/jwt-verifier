@@ -101,18 +101,17 @@ func (m *Middleware) Parse(tokenString string) (*Token, error) {
 		return nil, fmt.Errorf("token can not be used before: %v", t.ReservedClaims.NotBefore)
 	}
 
-	// get the public key
+	// Get the public key
 	pub, err := m.getKey(t)
-	if err != nil {
-		if m.withRefresh {
-			m.refreshKeys()
+
+	if err != nil && m.withRefresh {
+		if err = m.refreshKeys(); err != nil {
 			pub, err = m.getKey(t)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
 		}
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	// Hash the token header/payload and verify the signature of the token
@@ -151,22 +150,22 @@ func (m *Middleware) refreshKeys() error {
 
 	clear(m.keys)
 
-	for _, url := range m.openIDConfigurationURLs {
+	for _, configurationURL := range m.openIDConfigurationURLs {
 		var config OpenIDConfiguration
-		err := loadStructFromURL(&config, url)
+		err := loadStructFromURL(&config, configurationURL)
 		if err != nil {
 			return err
 		}
 
-		var jwks KeySet
-		err = loadStructFromURL(&jwks, config.JWKSURI)
+		var keySet KeySet
+		err = loadStructFromURL(&keySet, config.JWKSURI)
 		if err != nil {
 			return err
 		}
 
 		keyMap := map[string]*rsa.PublicKey{}
 
-		for _, k := range jwks.Keys {
+		for _, k := range keySet.Keys {
 			pub, err := k.PublicKey()
 			if err != nil {
 				return err
